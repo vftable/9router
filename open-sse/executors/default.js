@@ -81,6 +81,11 @@ export class DefaultExecutor extends BaseExecutor {
     super(provider, PROVIDERS[provider] || PROVIDERS.openai);
   }
 
+  // Newer OpenAI models (gpt-5+, o1, o3, o4) require max_completion_tokens instead of max_tokens
+  requiresMaxCompletionTokens(model) {
+    return /gpt-5|o[134]-/i.test(model);
+  }
+
   transformRequest(model, body) {
     const transformed = this.applyJsonSchemaFallback(body);
 
@@ -89,7 +94,14 @@ export class DefaultExecutor extends BaseExecutor {
       if (this.config.quirks?.dropClientMetadata) {
         delete transformed.client_metadata;
       }
+
       stripUnsupportedParams(this.provider, model, transformed);
+
+      // Rename max_tokens → max_completion_tokens for models that require it
+      if (this.requiresMaxCompletionTokens(model) && transformed.max_tokens !== undefined) {
+        transformed.max_completion_tokens = transformed.max_tokens;
+        delete transformed.max_tokens;
+      }
     }
 
     return injectReasoningContent({ provider: this.provider, model, body: transformed });
@@ -119,7 +131,7 @@ export class DefaultExecutor extends BaseExecutor {
     if (this.provider?.startsWith?.("openai-compatible-")) {
       const baseUrl = credentials?.providerSpecificData?.baseUrl || OPENAI_COMPAT_BASE;
       const normalized = baseUrl.replace(/\/$/, "");
-      const path = this.provider.includes("responses") ? "/responses" : "/chat/completions";
+      const path = (this.provider.includes("responses") || this.requiresMaxCompletionTokens(model)) ? "/responses" : "/chat/completions";
       return `${normalized}${path}`;
     }
     if (this.provider?.startsWith?.("anthropic-compatible-")) {
