@@ -91,6 +91,55 @@ export function openaiToClaudeRequest(model, body, stream) {
 
     flushCurrentMessage();
 
+    // Ensure conversation ends with a user message for Claude models.
+    // Claude rejects trailing assistant messages (no prefill).  Move trailing
+    // text-only assistant messages before the last user message so nothing is
+    // lost.  Assistant messages with tool_use are kept in place — moving them
+    // would break tool_use → tool_result ordering.
+    if (/claude-/i.test(model) && result.messages.length > 0 && result.messages[result.messages.length - 1].role !== ROLE.USER) {
+      // Collect trailing text-only assistant messages (no tool_use)
+      const trailingTextAssistants = [];
+      let i = result.messages.length - 1;
+      while (i >= 0 && result.messages[i].role === ROLE.ASSISTANT) {
+        const msg = result.messages[i];
+        const hasToolUse = Array.isArray(msg.content) && msg.content.some(b => b.type === CLAUDE_BLOCK.TOOL_USE);
+        if (hasToolUse) break;
+        trailingTextAssistants.unshift(msg);
+        i--;
+      }
+
+      if (trailingTextAssistants.length > 0) {
+        // Find the last user message before the trailing assistants
+        let lastUserIdx = -1;
+        for (let j = i; j >= 0; j--) {
+          if (result.messages[j].role === ROLE.USER) {
+            lastUserIdx = j;
+            break;
+          }
+        }
+
+        if (lastUserIdx >= 0) {
+          // Move trailing text assistants before the last user message
+          const lastUserMsg = result.messages[lastUserIdx];
+          const before = result.messages.slice(0, lastUserIdx);
+          const middle = result.messages.slice(lastUserIdx + 1, i + 1);
+          result.messages = [...before, ...middle, ...trailingTextAssistants, lastUserMsg];
+        } else {
+          // No earlier user — drop trailing text assistants (nothing to anchor to)
+          result.messages = result.messages.slice(0, i + 1);
+        }
+      }
+    }
+
+    // Drop empty assistant messages that are no longer final
+    // (may have been moved from final position by the prefill fix above)
+    if (result.messages.length > 1) {
+      result.messages = result.messages.filter((msg, idx) =>
+        !(msg.role === ROLE.ASSISTANT && idx < result.messages.length - 1 &&
+          (!Array.isArray(msg.content) || msg.content.length === 0))
+      );
+    }
+
     // Add cache_control to last assistant message
     for (let i = result.messages.length - 1; i >= 0; i--) {
       const message = result.messages[i];

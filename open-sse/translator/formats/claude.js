@@ -182,11 +182,60 @@ export function prepareClaudeRequest(body, provider = null, apiKey = null, conne
     // Each tool_use must have tool_result in the NEXT message (not same message with other content)
     filtered = fixToolUseOrdering(filtered);
 
+    // Pass 1.6: Ensure conversation ends with a user message (no prefill)
+    // Claude rejects trailing assistant messages.  Move trailing text-only
+    // assistant messages before the last user message so nothing is lost.
+    // Assistant messages with tool_use are kept in place — moving them would
+    // break tool_use → tool_result ordering.
+    if (filtered.length > 0 && filtered[filtered.length - 1].role !== ROLE.USER) {
+      // Collect trailing text-only assistant messages (no tool_use)
+      const trailingTextAssistants = [];
+      let i = filtered.length - 1;
+      while (i >= 0 && filtered[i].role === ROLE.ASSISTANT) {
+        const msg = filtered[i];
+        const hasToolUse = Array.isArray(msg.content) && msg.content.some(b => b.type === CLAUDE_BLOCK.TOOL_USE);
+        if (hasToolUse) break;
+        trailingTextAssistants.unshift(msg);
+        i--;
+      }
+
+      if (trailingTextAssistants.length > 0) {
+        // Find the last user message before the trailing assistants
+        let lastUserIdx = -1;
+        for (let j = i; j >= 0; j--) {
+          if (filtered[j].role === ROLE.USER) {
+            lastUserIdx = j;
+            break;
+          }
+        }
+
+        if (lastUserIdx >= 0) {
+          // Move trailing text assistants before the last user message
+          const lastUserMsg = filtered[lastUserIdx];
+          const before = filtered.slice(0, lastUserIdx);
+          const middle = filtered.slice(lastUserIdx + 1, i + 1);
+          filtered = [...before, ...middle, ...trailingTextAssistants, lastUserMsg];
+        } else {
+          // No earlier user — drop trailing text assistants (nothing to anchor to)
+          filtered = filtered.slice(0, i + 1);
+        }
+      }
+    }
+
+    // Pass 1.7: Drop empty assistant messages that are no longer final
+    // (Pass 1 kept empty final assistants for prefill; Pass 1.6 may have
+    // moved them, leaving invalid empty assistants in the middle.)
+    if (filtered.length > 1) {
+      filtered = filtered.filter((msg, idx) =>
+        !(msg.role === ROLE.ASSISTANT && idx < filtered.length - 1 && !hasValidContent(msg))
+      );
+    }
+
     body.messages = filtered;
 
     // Check if thinking is enabled AND last message is from user
     const lastMessage = filtered[filtered.length - 1];
-    const lastMessageIsUser = lastMessage?.role === "user";
+    const lastMessageIsUser = lastMessage?.role === ROLE.USER;
     const thinkingEnabled = body.thinking?.type === "enabled" && lastMessageIsUser;
 
     // Pass 2 (reverse): add cache_control to last assistant + handle thinking for Anthropic
