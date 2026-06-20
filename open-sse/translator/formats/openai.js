@@ -8,7 +8,7 @@ export { VALID_OPENAI_CONTENT_TYPES, VALID_OPENAI_MESSAGE_TYPES };
 // Remove: thinking, redacted_thinking, signature, and other non-OpenAI blocks
 export function filterToOpenAIFormat(body) {
   if (!body.messages || !Array.isArray(body.messages)) return body;
-  
+
   body.messages = body.messages.map(msg => {
     // Normalize developer role to system (many providers don't support developer)
     if (msg.role === ROLE.DEVELOPER) msg = { ...msg, role: ROLE.SYSTEM };
