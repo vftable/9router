@@ -18,8 +18,8 @@ function sanitizeFunctionName(name) {
 const MAX_RETRY_AFTER_MS = 10000;
 const MAX_ANTIGRAVITY_OUTPUT_TOKENS = 16384;
 
-// Fields Google generateContent rejects (e.g. Claude adaptive output_config) — stripped from antigravity request envelope
-const ANTIGRAVITY_REQUEST_BLACKLIST = ["output_config"];
+// Fields Google generateContent rejects — stripped from both body.request and top-level body
+const ANTIGRAVITY_REQUEST_BLACKLIST = ["output_config", "thinking", "reasoning_effort", "reasoning"];
 
 export class AntigravityExecutor extends BaseExecutor {
   constructor() {
