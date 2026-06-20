@@ -89,6 +89,26 @@ export class AntigravityExecutor extends BaseExecutor {
     // Strip tools/toolConfig (handled separately) and blacklisted fields that Google rejects
     const { tools: _originalTools, toolConfig: _originalToolConfig, ...requestWithoutTools } = body.request || {};
     for (const key of ANTIGRAVITY_REQUEST_BLACKLIST) delete requestWithoutTools[key];
+
+    // Convert Claude output_config.effort → Gemini thinkingConfig (reasoning intent must
+    // survive the format hop; output_config is not a Google API field).
+    const effort = body.output_config?.effort;
+    if (effort) {
+      const gc = requestWithoutTools.generationConfig || (requestWithoutTools.generationConfig = {});
+      if (!gc.thinkingConfig) {
+        const e = String(effort).toLowerCase();
+        if (e === "none" || e === "off") {
+          gc.thinkingConfig = { thinkingBudget: 0, includeThoughts: false };
+        } else if (e === "auto") {
+          gc.thinkingConfig = { thinkingBudget: -1, includeThoughts: true };
+        } else {
+          gc.thinkingConfig = { thinkingLevel: e, includeThoughts: true };
+        }
+      }
+    }
+
+    // Strip blacklisted fields from top-level body (output_config already converted above)
+    for (const key of ANTIGRAVITY_REQUEST_BLACKLIST) delete body[key];
     const generationConfig = { ...(requestWithoutTools.generationConfig || {}) };
     if (generationConfig.maxOutputTokens > MAX_ANTIGRAVITY_OUTPUT_TOKENS) {
       generationConfig.maxOutputTokens = MAX_ANTIGRAVITY_OUTPUT_TOKENS;
