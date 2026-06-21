@@ -23,10 +23,6 @@ export class OpenAIExecutor extends DefaultExecutor {
       return rt.urlSuffix ? `${rt.baseUrl}${rt.urlSuffix}` : rt.baseUrl;
     }
 
-    if (this.requiresResponsesEndpoint(model) && this.config.responsesUrl) {
-      return this.config.responsesUrl;
-    }
-
     return this.config.baseUrl;
   }
 
@@ -43,7 +39,7 @@ export class OpenAIExecutor extends DefaultExecutor {
     if (result.response.status === HTTP_STATUS.BAD_REQUEST && this.requiresResponsesEndpoint(model)) {
       const errorBody = await result.response.clone().text();
 
-      if (errorBody.includes("reasoning_effort") || errorBody.includes("/v1/responses")) {
+      if (errorBody.includes("reasoning_effort") || errorBody.includes("/v1/responses") || errorBody.includes("'messages'") || errorBody.includes("'input'")) {
         log?.warn("OPENAI", `Model ${model} requires /responses. Switching...`);
         this.knownResponsesModels.add(model);
         return this.executeWithResponsesEndpoint(options);
