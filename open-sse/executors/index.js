@@ -18,6 +18,7 @@ import { CommandCodeExecutor } from "./commandcode.js";
 import { XiaomiTokenplanExecutor } from "./xiaomi-tokenplan.js";
 import { MimoFreeExecutor } from "./mimo-free.js";
 import { CodeBuddyExecutor } from "./codebuddy-cn.js";
+import { OpenAIExecutor } from "./openai.js";
 import { DefaultExecutor } from "./default.js";
 
 const executors = {
@@ -44,6 +45,7 @@ const executors = {
   "mimo-free": new MimoFreeExecutor(),
   mmf: new MimoFreeExecutor(), // Alias for mimo-free
   "codebuddy-cn": new CodeBuddyExecutor(),
+  openai: new OpenAIExecutor(),
 };
 
 const defaultCache = new Map();
@@ -70,6 +72,7 @@ export { CodexExecutor } from "./codex.js";
 export { CursorExecutor } from "./cursor.js";
 export { VertexExecutor } from "./vertex.js";
 export { DefaultExecutor } from "./default.js";
+export { OpenAIExecutor } from "./openai.js";
 export { QwenExecutor } from "./qwen.js";
 export { OpenCodeExecutor } from "./opencode.js";
 export { OpenCodeGoExecutor } from "./opencode-go.js";

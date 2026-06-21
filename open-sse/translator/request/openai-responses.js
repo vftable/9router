@@ -317,6 +317,11 @@ export function openaiToOpenAIResponsesRequest(model, body, stream, credentials)
   if (body.max_tokens !== undefined) result.max_tokens = body.max_tokens;
   if (body.top_p !== undefined) result.top_p = body.top_p;
 
+  // Convert reasoning_effort → reasoning.effort for Responses API
+  if (body.reasoning_effort) {
+    result.reasoning = { effort: body.reasoning_effort, summary: "auto" };
+  }
+
   return result;
 }
 
