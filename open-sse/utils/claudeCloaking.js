@@ -47,26 +47,34 @@ export function cloakClaudeTools(body) {
   const clientToolNames = new Set();
   const clientDeclarations = [];
 
-  // All client tools get renamed with suffix.
+  // CC-native tools (Read, Bash, etc.) are kept as-is — they already look like
+  // real Claude Code tools. Only custom/MCP tools get the suffix.
   // Built-in server tools (web_search_20250305, etc.) carry a `type` and require
   // an exact reserved `name` — never suffix those or Claude rejects the request.
   for (const tool of tools) {
     if (tool.type) { clientDeclarations.push(tool); continue; }
-    const suffixed = suffix(tool.name);
-    toolNameMap.set(suffixed, tool.name);
     clientToolNames.add(tool.name);
-    clientDeclarations.push({ ...tool, name: suffixed });
+    if (CC_DEFAULT_TOOLS.has(tool.name)) {
+      clientDeclarations.push(tool);
+    } else {
+      const suffixed = suffix(tool.name);
+      toolNameMap.set(suffixed, tool.name);
+      clientDeclarations.push({ ...tool, name: suffixed });
+    }
   }
 
-  // Client tools first, then CC decoy tools (no overlap: client tools all have _cc suffix)
-  const allTools = [...clientDeclarations, ...CC_DECOY_TOOLS];
+  // Client tools first, then CC decoy tools not already provided by the client
+  const decoysToAdd = CC_DECOY_TOOLS.filter(d => !clientToolNames.has(d.name));
+  const allTools = [...clientDeclarations, ...decoysToAdd];
 
-  // Rename tool_use in message history (all client tools get suffix)
+  // Rename only non-CC tool_use blocks in message history
   const renamedMessages = body.messages?.map(msg => {
     if (!Array.isArray(msg.content)) return msg;
-    const renamedContent = msg.content.map(block =>
-      block.type === "tool_use" ? { ...block, name: suffix(block.name) } : block
-    );
+    const renamedContent = msg.content.map(block => {
+      if (block.type !== "tool_use") return block;
+      if (CC_DEFAULT_TOOLS.has(block.name)) return block;
+      return { ...block, name: suffix(block.name) };
+    });
     return { ...msg, content: renamedContent };
   });
 
@@ -74,11 +82,11 @@ export function cloakClaudeTools(body) {
 
   // A forced tool_choice ({ type: "tool", name }) must point at the suffixed
   // tool name, otherwise Claude rejects it: "Tool '<name>' not found in provided tools".
-  // Only rewrite when the choice targets one of the client tools we actually
-  // renamed — never a decoy/built-in name (those are sent unsuffixed).
+  // Only rewrite when the choice targets a non-CC client tool we actually renamed.
   if (
     body.tool_choice?.type === "tool" &&
-    clientToolNames.has(body.tool_choice.name)
+    clientToolNames.has(body.tool_choice.name) &&
+    !CC_DEFAULT_TOOLS.has(body.tool_choice.name)
   ) {
     cloakedBody.tool_choice = { ...body.tool_choice, name: suffix(body.tool_choice.name) };
   }
