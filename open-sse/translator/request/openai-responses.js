@@ -318,6 +318,8 @@ export function openaiToOpenAIResponsesRequest(model, body, stream, credentials)
   else if (body.max_tokens !== undefined) result.max_output_tokens = body.max_tokens;
   else if (body.max_completion_tokens !== undefined) result.max_output_tokens = body.max_completion_tokens;
   if (body.top_p !== undefined) result.top_p = body.top_p;
+  if (body.reasoning !== undefined) result.reasoning = body.reasoning;
+  if (body.reasoning_effort !== undefined) result.reasoning = { effort: body.reasoning_effort, summary: "auto" };
 
   // Convert reasoning_effort → reasoning.effort for Responses API
   if (body.reasoning_effort) {
