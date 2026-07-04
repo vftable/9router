@@ -121,10 +121,11 @@ export function translateRequest(sourceFormat, targetFormat, model, body, stream
   }
 
   // Claude cloaking: rename client tools with _cc suffix (anti-ban)
-  // quirk: only providers flagged cloakToolsOnOAuth, and only with an OAuth token
-  if (PROVIDERS[provider]?.quirks?.cloakToolsOnOAuth) {
-    const apiKey = credentials?.accessToken || credentials?.apiKey || null;
-    if (apiKey?.includes("sk-ant-oat")) {
+  // Applies for ANY OAuth token (sk-ant-oat) regardless of provider, since the
+  // token type — not the provider entry — determines whether Claude will ban.
+  {
+    const cloakApiKey = credentials?.accessToken || credentials?.apiKey || null;
+    if (cloakApiKey?.includes("sk-ant-oat")) {
       const { body: cloakedBody, toolNameMap } = cloakClaudeTools(result);
       result = cloakedBody;
       if (toolNameMap?.size > 0) {

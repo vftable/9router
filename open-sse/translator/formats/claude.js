@@ -108,8 +108,10 @@ function buildThinkingPlaceholder(provider) {
 // 1. thinking.type "adaptive" → unsupported on Haiku
 // 2. output_config.effort → unsupported on Haiku
 // 3. role "system" messages (mid-conversation-system beta) → only top-level system is allowed
-export function normalizeClaudePassthrough(body, model = "") {
+export function normalizeClaudePassthrough(body, model = "", apiKey = null) {
   if (!body || typeof body !== "object") return body;
+
+  const isOAuth = !!apiKey && apiKey.includes("sk-ant-oat");
 
   // 1. Downgrade adaptive thinking for models that don't support it
   if (body.thinking?.type === "adaptive" && ADAPTIVE_THINKING_UNSUPPORTED.test(model)) {
@@ -152,6 +154,10 @@ export function normalizeClaudePassthrough(body, model = "") {
 
   // 3. Drop thinking blocks whose signature is not Claude's (combo mixes models,
   // so foreign signatures leak into history and Anthropic rejects them).
+  // For OAuth tokens (sk-ant-oat), Claude does strict cryptographic signature
+  // validation. We can't validate signatures server-side, and the static
+  // DEFAULT_THINKING_CLAUDE_SIGNATURE placeholder fails OAuth validation — so
+  // strip ALL thinking blocks and don't inject fake-signature placeholders.
   const thinkingEnabled = body.thinking?.type === "enabled";
   if (Array.isArray(body.messages)) {
     for (const msg of body.messages) {
@@ -161,6 +167,7 @@ export function normalizeClaudePassthrough(body, model = "") {
       const kept = [];
       for (const block of msg.content) {
         if (block.type === CLAUDE_BLOCK.THINKING || block.type === CLAUDE_BLOCK.REDACTED_THINKING) {
+          if (isOAuth) continue;
           if (isValidClaudeSignature(block.signature)) {
             hasKeptThinking = true;
             kept.push(block);
@@ -171,7 +178,7 @@ export function normalizeClaudePassthrough(body, model = "") {
         kept.push(block);
       }
       msg.content = kept;
-      if (thinkingEnabled && !hasKeptThinking && hasToolUse) {
+      if (thinkingEnabled && !hasKeptThinking && hasToolUse && !isOAuth) {
         msg.content.unshift(buildThinkingPlaceholder("claude"));
       }
     }
@@ -317,14 +324,21 @@ export function prepareClaudeRequest(body, provider = null, apiKey = null, conne
           let hasKeptThinking = false;
 
           // Claude native: preserve valid signatures, drop invalid blocks.
+          // OAuth (sk-ant-oat): strip ALL thinking blocks — Claude does strict
+          // crypto validation we can't reproduce, and the static placeholder
+          // signature is rejected. Don't inject fake-signature placeholders.
           // anthropic-compatible: replace with default (safe fallback for lenient upstreams).
           // DeepSeek: keep existing thinking as-is; add an unsigned placeholder only if missing.
           const isClaudeNative = provider === "claude";
+          const isOAuthClaude = isClaudeNative && !!apiKey && apiKey.includes("sk-ant-oat");
           const isDeepSeek = provider === "deepseek";
           const kept = [];
           for (const block of msg.content) {
             const isThinking = block.type === CLAUDE_BLOCK.THINKING || block.type === CLAUDE_BLOCK.REDACTED_THINKING;
             if (isThinking) {
+              if (isOAuthClaude) {
+                continue;
+              }
               if (isClaudeNative) {
                 if (isValidClaudeSignature(block.signature)) {
                   hasKeptThinking = true;
@@ -346,7 +360,8 @@ export function prepareClaudeRequest(body, provider = null, apiKey = null, conne
           msg.content = kept;
 
           // Add thinking block if thinking enabled + has tool_use but no thinking
-          if (thinkingEnabled && !hasKeptThinking && hasToolUse) {
+          // Skip for OAuth — the fake-signature placeholder causes 400 rejection
+          if (thinkingEnabled && !hasKeptThinking && hasToolUse && !isOAuthClaude) {
             msg.content.unshift(buildThinkingPlaceholder(provider));
           }
         }

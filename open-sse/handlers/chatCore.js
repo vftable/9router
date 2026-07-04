@@ -2,6 +2,8 @@ import { detectFormat, getTargetFormat, resolveTransport } from "../services/pro
 import { translateRequest } from "../translator/index.js";
 import { FORMATS } from "../translator/formats.js";
 import { normalizeClaudePassthrough } from "../translator/formats/claude.js";
+import { applyCloaking, cloakClaudeTools } from "../utils/claudeCloaking.js";
+import { resolveSessionId } from "../utils/sessionManager.js";
 import { COLORS } from "../utils/stream.js";
 import { createStreamController } from "../utils/streamHandler.js";
 import { refreshWithRetry } from "../services/tokenRefresh.js";
@@ -125,7 +127,21 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
     log?.debug?.("PASSTHROUGH", `${clientTool} → ${provider} | native lossless`);
     translatedBody = { ...body, model: upstreamModel };
     // Normalize newer Cowork/CC beta shapes (adaptive thinking, mid-conversation system) the API rejects
-    if (clientTool === "claude") normalizeClaudePassthrough(translatedBody, upstreamModel);
+    if (clientTool === "claude") {
+      // Upstream token (OAuth access_token or provider API key) — NOT the client's proxy key
+      const upstreamToken = credentials?.accessToken || credentials?.apiKey || null;
+      normalizeClaudePassthrough(translatedBody, upstreamModel, upstreamToken);
+      // Apply anti-ban cloaking (billing header + fake user ID + tool renaming)
+      // for ANY OAuth token — passthrough skips translateRequest so this is the
+      // only place cloaking is applied for native Claude Code → Claude requests.
+      if (upstreamToken?.includes("sk-ant-oat")) {
+        const sid = resolveSessionId({ headers: clientRawRequest?.headers, body: translatedBody, connectionId, scope: "claude" });
+        translatedBody = applyCloaking(translatedBody, upstreamToken, sid);
+        const { body: cloakedBody, toolNameMap: tnm } = cloakClaudeTools(translatedBody);
+        translatedBody = cloakedBody;
+        toolNameMap = tnm;
+      }
+    }
   } else {
     translatedBody = translateRequest(sourceFormat, targetFormat, upstreamModel, body, stream, credentials, provider, reqLogger, stripList, connectionId, clientTool);
     if (!translatedBody) {
