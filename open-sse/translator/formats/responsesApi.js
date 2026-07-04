@@ -135,6 +135,12 @@ export function convertResponsesApiFormat(body) {
   delete result.include;
   delete result.prompt_cache_key;
   delete result.store;
+  // Convert reasoning.effort (Responses API) to reasoning_effort (Chat Completions)
+  // so thinking intent survives format conversion; applyThinking will reformat
+  // to the target provider's native shape.
+  if (result.reasoning && typeof result.reasoning === "object" && result.reasoning.effort) {
+    result.reasoning_effort = result.reasoning.effort;
+  }
   delete result.reasoning;
 
   return result;

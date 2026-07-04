@@ -9,9 +9,9 @@ import { LEVEL_TO_BUDGET, budgetToLevel, effortToBudget, effortToThinkingLevel }
 // Map a target wire-format to its native thinking format (when capability has none).
 const FORMAT_TO_NATIVE = {
   openai: "openai",
-  "openai-responses": "openai",
+  "openai-responses": "openai-responses",
   "openai-response": "openai",
-  codex: "openai",
+  codex: "openai-responses",
   claude: "claude-budget",
   gemini: "gemini-budget",
   "gemini-cli": "gemini-budget",
@@ -169,6 +169,12 @@ function applyFormat(fmt, body, cfg, caps) {
       if (none && canDisable) { body.reasoning_effort = "none"; break; }
       const level = toLevel(eff);
       if (level) body.reasoning_effort = level;
+      break;
+    }
+    case "openai-responses": {
+      if (none && canDisable) { body.reasoning = { effort: "none", summary: "auto" }; break; }
+      const level = toLevel(eff);
+      if (level) body.reasoning = { effort: level, summary: "auto" };
       break;
     }
     case "claude-adaptive": {
