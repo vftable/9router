@@ -101,7 +101,14 @@ function resolveFormat(targetFormat, model, provider) {
   const providerFmt = provider ? PROVIDERS[provider]?.thinkingFormat : null;
   if (providerFmt) return providerFmt;
   const caps = getCapabilitiesForModel(provider, model);
-  if (caps.thinkingFormat) return caps.thinkingFormat;
+  if (caps.thinkingFormat) {
+    // Capability says "openai" but target is Responses API → use Responses shape
+    // (reasoning.effort instead of reasoning_effort).
+    if (caps.thinkingFormat === "openai" && (targetFormat === "openai-responses" || targetFormat === "codex")) {
+      return "openai-responses";
+    }
+    return caps.thinkingFormat;
+  }
   return FORMAT_TO_NATIVE[targetFormat] || "openai";
 }
 
