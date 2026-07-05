@@ -73,4 +73,21 @@ describe("cloakClaudeTools", () => {
     expect(body).toBe(input);
     expect(toolNameMap).toBeNull();
   });
+
+  it("does not double-suffix tool names that already end with the suffix", () => {
+    // If a client replays conversation history that already contains a suffixed
+    // tool_use (e.g. it received the suffixed name via a non-decloaked path),
+    // re-suffixing would produce "todo_write_ide_ide" and break tool dispatch.
+    const suffixed = `todo_write${CLAUDE_TOOL_SUFFIX}`;
+    const { body } = cloakClaudeTools({
+      tools: [{ name: suffixed, input_schema: { type: "object", properties: {} } }],
+      messages: [
+        { role: "assistant", content: [{ type: "tool_use", id: "t1", name: suffixed, input: {} }] }
+      ]
+    });
+    expect(body.tools.find(t => t.name === suffixed)).toBeDefined();
+    expect(body.tools.find(t => t.name === `${suffixed}${CLAUDE_TOOL_SUFFIX}`)).toBeUndefined();
+    const block = body.messages[0].content[0];
+    expect(block.name).toBe(suffixed);
+  });
 });

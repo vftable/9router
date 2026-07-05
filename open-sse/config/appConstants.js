@@ -78,8 +78,29 @@ export const AG_TOOL_SUFFIX = "_ide";
 export const CLAUDE_TOOL_SUFFIX = "_ide";
 
 // CC native default tools — these are Claude Code's own tools, kept as decoys
-// Client tools matching these names are skipped (not renamed), others get _cc suffix
+// Client tools matching these names are skipped (not renamed), others get _ide suffix
 export const CC_DEFAULT_TOOLS = new Set([
+  "Agent",
+  "AskUserQuestion",
+  "Bash",
+  "CronCreate",
+  "CronDelete",
+  "CronList",
+  "DesignSync",
+  "Edit",
+  "EnterPlanMode",
+  "EnterWorktree",
+  "ExitPlanMode",
+  "ExitWorktree",
+  "Glob",
+  "Grep",
+  "Monitor",
+  "NotebookEdit",
+  "PowerShell",
+  "PushNotification",
+  "Read",
+  "ScheduleWakeup",
+  "Skill",
   "Task",
   "TaskOutput",
   "TaskStop",
@@ -87,19 +108,10 @@ export const CC_DEFAULT_TOOLS = new Set([
   "TaskGet",
   "TaskUpdate",
   "TaskList",
-  "Bash",
-  "Glob",
-  "Grep",
-  "Read",
-  "Edit",
-  "Write",
-  "NotebookEdit",
   "WebFetch",
   "WebSearch",
-  "AskUserQuestion",
-  "Skill",
-  "EnterPlanMode",
-  "ExitPlanMode",
+  "Workflow",
+  "Write",
 ]);
 
 // AG native default tools — kept as decoys with neutral description/properties

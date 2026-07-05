@@ -42,7 +42,11 @@ export function cloakClaudeTools(body) {
   const tools = body.tools;
   if (!tools || tools.length === 0) return { body, toolNameMap: null };
 
-  const suffix = (name) => `${name}${CLAUDE_TOOL_SUFFIX}`;
+  // Idempotent: never append the suffix twice. If a tool name already carries
+  // it (e.g. client replayed conversation history containing a suffixed block),
+  // re-suffixing would produce names like "Foo_ide_ide" that no longer match
+  // any declared tool, causing "No such tool available" errors.
+  const suffix = (name) => name.endsWith(CLAUDE_TOOL_SUFFIX) ? name : `${name}${CLAUDE_TOOL_SUFFIX}`;
   const toolNameMap = new Map();
   const clientToolNames = new Set();
   const clientDeclarations = [];

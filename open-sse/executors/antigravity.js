@@ -447,7 +447,9 @@ export class AntigravityExecutor extends BaseExecutor {
           continue;
         }
 
-        const suffixed = `${func.name}${AG_TOOL_SUFFIX}`;
+        // Idempotent: don't append the suffix if the name already ends with it,
+        // otherwise replayed history can produce "Foo_ide_ide" mismatches.
+        const suffixed = func.name.endsWith(AG_TOOL_SUFFIX) ? func.name : `${func.name}${AG_TOOL_SUFFIX}`;
         toolNameMap.set(suffixed, func.name);
         clientDeclarations.push({ ...func, name: suffixed });
       }
@@ -467,24 +469,28 @@ export class AntigravityExecutor extends BaseExecutor {
       if (!msg.parts) return msg;
       
       const cloakedParts = msg.parts.map(part => {
-        // Rename functionCall.name
+        // Rename functionCall.name (idempotent — skip if already suffixed)
         if (part.functionCall && !AG_DEFAULT_TOOLS.has(part.functionCall.name)) {
           return {
             ...part,
             functionCall: {
               ...part.functionCall,
-              name: `${part.functionCall.name}${AG_TOOL_SUFFIX}`
+              name: part.functionCall.name.endsWith(AG_TOOL_SUFFIX)
+                ? part.functionCall.name
+                : `${part.functionCall.name}${AG_TOOL_SUFFIX}`
             }
           };
         }
-        
-        // Rename functionResponse.name
+
+        // Rename functionResponse.name (idempotent — skip if already suffixed)
         if (part.functionResponse && !AG_DEFAULT_TOOLS.has(part.functionResponse.name)) {
           return {
             ...part,
             functionResponse: {
               ...part.functionResponse,
-              name: `${part.functionResponse.name}${AG_TOOL_SUFFIX}`
+              name: part.functionResponse.name.endsWith(AG_TOOL_SUFFIX)
+                ? part.functionResponse.name
+                : `${part.functionResponse.name}${AG_TOOL_SUFFIX}`
             }
           };
         }
