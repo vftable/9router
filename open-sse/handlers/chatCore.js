@@ -1,5 +1,6 @@
 import { detectFormat, getTargetFormat, resolveTransport } from "../services/provider.js";
 import { translateRequest } from "../translator/index.js";
+import { stripThinkingSuffix } from "../translator/concerns/thinkingUnified.js";
 import { FORMATS } from "../translator/formats.js";
 import { normalizeClaudePassthrough } from "../translator/formats/claude.js";
 import { applyCloaking, cloakClaudeTools } from "../utils/claudeCloaking.js";
@@ -125,12 +126,12 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
   let toolNameMap;
   if (passthrough) {
     log?.debug?.("PASSTHROUGH", `${clientTool} → ${provider} | native lossless`);
-    translatedBody = { ...body, model: upstreamModel };
+    translatedBody = { ...body, model: stripThinkingSuffix(upstreamModel) };
     // Normalize newer Cowork/CC beta shapes (adaptive thinking, mid-conversation system) the API rejects
     if (clientTool === "claude") {
       // Upstream token (OAuth access_token or provider API key) — NOT the client's proxy key
       const upstreamToken = credentials?.accessToken || credentials?.apiKey || null;
-      normalizeClaudePassthrough(translatedBody, upstreamModel, upstreamToken);
+      normalizeClaudePassthrough(translatedBody, translatedBody.model, upstreamToken);
       // Apply anti-ban cloaking (billing header + fake user ID + tool renaming)
       // for ANY OAuth token — passthrough skips translateRequest so this is the
       // only place cloaking is applied for native Claude Code → Claude requests.
@@ -150,7 +151,7 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
     }
     toolNameMap = translatedBody._toolNameMap;
     delete translatedBody._toolNameMap;
-    translatedBody.model = upstreamModel;
+    translatedBody.model = stripThinkingSuffix(upstreamModel);
   }
 
   // Dedupe duplicate built-in tools when equivalent MCP tools are present (Claude clients only).
