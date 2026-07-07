@@ -75,7 +75,7 @@ export const INTERNAL_REQUEST_HEADER = { name: "x-request-source", value: "local
 export const AG_TOOL_SUFFIX = "_ide";
 
 // Suffix added to client tools when forwarding to Claude provider (anti-ban cloaking)
-export const CLAUDE_TOOL_SUFFIX = "_ide";
+export const CLAUDE_TOOL_SUFFIX = "";
 
 // CC native default tools — these are Claude Code's own tools, kept as decoys
 // Client tools matching these names are skipped (not renamed), others get _ide suffix
